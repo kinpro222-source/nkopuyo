@@ -272,10 +272,16 @@
         draw();
     }
 
-    function shareOnX() {
-        const text = encodeURIComponent(`ことばパズル「んこぷよ」で ${score} 点獲得しました！\n`);
-        window.open(`https://twitter.com/intent/tweet?text=${text}&hashtags=んこぷよ`, '_blank');
-    }
+function shareOnX() {
+    // ↓ここを自分の公開したURLに書き換えてください
+    const myUrl = "https://raw.githack.com/kinpro222-source/nkopuyo/main/index.html"; 
+    
+    const text = encodeURIComponent(`ことばパズル「んこぷよ」で ${score} 点獲得しました！`);
+    const hashtags = "んこぷよ,自作ゲーム";
+    const url = `https://twitter.com/intent/tweet?text=${text}&url=${myUrl}&hashtags=${hashtags}`;
+    
+    window.open(url, '_blank');
+}
 
     function handleBtn(key) {
         if(!gameActive) return;
