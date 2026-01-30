@@ -273,12 +273,14 @@
     }
 
 function shareOnX() {
-    // ↓ここを自分の公開したURLに書き換えてください
+    // 【重要】ここを自分のURLに書き換える（例： https://tanaka.github.io/nkopyo/ ）
+    const myUrl = "https://raw.githack.com/kinpro222-source/nkopuyo/main/index.html"; 
     
-    const text = encodeURIComponent(`ことばパズル「んこぷよ」で ${score} 点獲得しました！https://raw.githack.com/kinpro222-source/nkopuyo/main/index.html`);
+    const text = encodeURIComponent(`ことばパズル「んこぷよ」で ${score} 点獲得しました！\n`);
     const hashtags = "んこぷよ,自作ゲーム";
-    const url = `https://twitter.com/intent/tweet?text=${text}&url=${myUrl}&hashtags=${hashtags}`;
     
+    // URLをセットしてXを開く
+    const url = `https://twitter.com/intent/tweet?text=${text}&url=${myUrl}&hashtags=${hashtags}`;
     window.open(url, '_blank');
 }
 
