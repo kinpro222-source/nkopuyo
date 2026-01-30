@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>んこぷよ</title>
+    <style>
+        body { text-align: center; font-family: sans-serif; background: #1a1a1a; color: white; margin: 0; padding-top: 20px; touch-action: none; overflow: hidden; }
+        .game-container { display: flex; justify-content: center; gap: 20px; position: relative; flex-wrap: wrap; }
+        canvas { border: 5px solid #444; background: #000; box-shadow: 0 0 30px rgba(0,0,0,0.8); max-width: 95vw; }
+        .sidebar { width: 180px; background: #333; padding: 15px; border-radius: 10px; text-align: left; }
+        .score-val { font-size: 2.5em; color: #ffeb3b; font-weight: bold; margin-bottom: 10px; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        .post-btn { padding: 15px 30px; margin: 10px; background: #1d9bf0; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 1.2em; }
+        .restart-btn { padding: 20px 40px; margin: 10px; background: #e91e63; color: white; border: 4px solid white; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 1.5em; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        #fever-overlay { position: absolute; top: 0; left: 0; width: 320px; height: 480px; background: rgba(255, 255, 0, 0.2); display: none; justify-content: center; align-items: center; font-size: 3.5em; font-weight: bold; color: #FF00FF; text-shadow: 0 0 15px white, 0 0 20px yellow; pointer-events: none; z-index: 100; }
+        .mobile-controls { margin-top: 15px; display: flex; flex-direction: column; align-items: center; gap: 8px; user-select: none; }
+        .row { display: flex; gap: 10px; }
+        .ctrl-btn { width: 65px; height: 65px; background: #555; color: white; border: none; border-radius: 50%; font-size: 1.1em; font-weight: bold; touch-action: manipulation; box-shadow: 0 5px #222; }
+    </style>
+</head>
+<body>
+
+    <div id="start-overlay" class="overlay">
+        <h1 style="color: #ffeb3b; font-size: 3em;">んこぷよ</h1>
+        <div class="restart-btn" onclick="startGame()">ゲームを開始する</div>
+    </div>
+
+    <div id="result-overlay" class="overlay" style="display: none;">
+        <h2 style="font-size: 2em;">GAME OVER</h2>
+        <div style="font-size: 1.5em; margin-bottom: 20px;">SCORE: <span id="finalScore" style="color:#ffeb3b; font-weight:bold;">0</span></div>
+        <button class="post-btn" onclick="shareOnX()">𝕏 に結果を投稿する</button>
+        <div class="restart-btn" onclick="startGame()">もう一度遊ぶ</div>
+    </div>
+
+    <h1>ことばパズル</h1>
+    
+    <div class="game-container">
+        <div style="position: relative;">
+            <canvas id="gameCanvas" width="320" height="480"></canvas>
+            <div id="fever-overlay">FEVER!!</div>
+        </div>
+        <div class="sidebar">
+            <div>SCORE</div>
+            <div id="scoreDisplay" class="score-val">0</div>
+        </div>
+    </div>
+
+    <div class="mobile-controls">
+        <div class="row"><button class="ctrl-btn" onpointerdown="handleBtn('ArrowUp')">回転</button></div>
+        <div class="row">
+            <button class="ctrl-btn" onpointerdown="handleBtn('ArrowLeft')">←</button>
+            <button class="ctrl-btn" onpointerdown="handleBtn('ArrowDown')">速</button>
+            <button class="ctrl-btn" onpointerdown="handleBtn('ArrowRight')">→</button>
+        </div>
+    </div>
+
+<script>
+    class SpeechQueue {
+        constructor() { this.queue = []; this.speaking = false; }
+        add(text, isHigh = false) { this.queue.push({text, isHigh}); if (!this.speaking) this.next(); }
+        next() {
+            if (this.queue.length === 0) { this.speaking = false; return; }
+            this.speaking = true;
+            const item = this.queue.shift();
+            const u = new SpeechSynthesisUtterance(item.text);
+            u.lang = 'ja-JP'; u.pitch = item.isHigh ? 1.5 : 1.0;
+            u.onend = () => this.next();
+            window.speechSynthesis.speak(u);
+        }
+    }
+    const voice = new SpeechQueue();
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const ROWS = 12, COLS = 8, SIZE = 40;
+    const dictionary = [
+                        "うこん",
+                        "うんこ",
+                        "うんこう",
+                        "うんち",
+                        "うんちん",
+                        "おうおう",
+                        "おうこ",
+                        "おうこう",
+                        "おうち",
+                        "おうま",
+                        "おこう",
+                        "おちんちん",
+                        "おまんこ",
+                        "おまんま",
+                        "おんこう",
+                        "おんち",
+                        "こうう",
+                        "こううん",
+                        "こうおん",
+                        "こうこう",
+                        "こうち",
+                        "こうちん",
+                        "こうま",
+                        "こうまん",
+                        "こんこん",
+                        "こんま",
+                        "ちこう",
+                        "ちんこ",
+                        "ちんこん",
+                        "ちんちん",
+                        "まおう",
+                        "まちこん",
+                        "まんこ",
+                        "まんま",
+                        "まんまん"
+
+
+];
+    const charColors = {'お': '#e91e63', 'ち': '#4caf50', 'ま': '#2196f3', 'う': '#9c27b0', 'ん': '#ffc107', 'こ': '#ff5722'};
+
+    let charWeights = [];
+    const calculateWeights = () => {
+        const counts = {};
+        Object.keys(charColors).forEach(c => counts[c] = 1);
+        dictionary.forEach(word => {
+            word.split('').forEach(char => { if(counts[char]) counts[char] += 2; });
+        });
+        charWeights = [];
+        for (let char in counts) {
+            for (let i = 0; i < counts[char]; i++) charWeights.push(char);
+        }
+    };
+    calculateWeights();
+
+    let board, score, gameActive = false, dropInterval, player;
+    let lastPairString = ""; 
+
+    function startGame() {
+        document.getElementById('start-overlay').style.display = 'none';
+        document.getElementById('result-overlay').style.display = 'none';
+        board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        score = 0;
+        updateScore(0);
+        gameActive = true;
+        voice.add("スタート");
+        initPlayer();
+        draw();
+        if(dropInterval) clearInterval(dropInterval);
+        dropInterval = setInterval(drop, 1000);
+    }
+
+    function updateScore(val) {
+        score = val;
+        document.getElementById('scoreDisplay').innerText = score;
+    }
+
+    function initPlayer() {
+        let c1, c2, currentPairString;
+        
+        // c1とc2が同じ文字にならず、かつ前回のペアとも重複しないようにループ
+        for(let i=0; i<20; i++) {
+            c1 = charWeights[Math.floor(Math.random() * charWeights.length)];
+            c2 = charWeights[Math.floor(Math.random() * charWeights.length)];
+            
+            // 条件1: c1 と c2 が同じ文字ではない
+            // 条件2: ソートした文字列が前回のものと一致しない
+            currentPairString = [c1, c2].sort().join("");
+            if (c1 !== c2 && currentPairString !== lastPairString) break;
+        }
+        
+        lastPairString = currentPairString;
+        player = { x: 3, y: 1, dir: 0, c1, c2 };
+    }
+
+    function getSubPos(x, y, dir) {
+        const d = [{dx:0, dy:-1}, {dx:1, dy:0}, {dx:0, dy:1}, {dx:-1, dy:0}][dir];
+        return { x: x + d.dx, y: y + d.dy };
+    }
+
+    function canMove(nx, ny, nd) {
+        const s = getSubPos(nx, ny, nd);
+        return nx >= 0 && nx < COLS && ny < ROWS && (!board[ny] || !board[ny][nx]) &&
+               s.x >= 0 && s.x < COLS && s.y < ROWS && (!board[s.y] || !board[s.y][s.x]);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        board.forEach((row, r) => row.forEach((cell, c) => { if(cell) drawBlock(c, r, cell.char, cell.color); }));
+        if(gameActive) {
+            drawBlock(player.x, player.y, player.c1, charColors[player.c1]);
+            const s = getSubPos(player.x, player.y, player.dir);
+            drawBlock(s.x, s.y, player.c2, charColors[player.c2]);
+        }
+    }
+
+    function drawBlock(x, y, char, color) {
+        if(y < 0) return;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.roundRect(x*SIZE+2, y*SIZE+2, SIZE-4, SIZE-4, 8); ctx.fill();
+        ctx.fillStyle = "white"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(char, x*SIZE+SIZE/2, y*SIZE+SIZE/2);
+    }
+
+    function drop() {
+        if(!gameActive) return;
+        if(canMove(player.x, player.y + 1, player.dir)) {
+            player.y++;
+        } else {
+            board[player.y][player.x] = { char: player.c1, color: charColors[player.c1] };
+            const s = getSubPos(player.x, player.y, player.dir);
+            if(s.y >= 0) board[s.y][s.x] = { char: player.c2, color: charColors[player.c2] };
+            check();
+            initPlayer();
+            if(!canMove(player.x, player.y, player.dir)) {
+                gameActive = false;
+                clearInterval(dropInterval);
+                voice.add("ゲームオーバー");
+                document.getElementById('finalScore').innerText = score;
+                document.getElementById('result-overlay').style.display = 'flex';
+            }
+        }
+        draw();
+    }
+
+    function check() {
+        let toClear = new Set();
+        let foundWords = [];
+        let fever = false;
+
+        for(let r=0; r<ROWS; r++){
+            let s = board[r].map(c => c?c.char:' ').join('');
+            dictionary.forEach(w => {
+                let i = -1; while((i=s.indexOf(w, i+1))!==-1) {
+                    foundWords.push(w); for(let j=0; j<w.length; j++) toClear.add(`${r},${i+j}`);
+                }
+            });
+        }
+        for(let c=0; c<COLS; c++){
+            let s = ""; for(let r=0; r<ROWS; r++) s += board[r][c]?board[r][c].char:' ';
+            dictionary.forEach(w => {
+                let i = -1; while((i=s.indexOf(w, i+1))!==-1) {
+                    foundWords.push(w); for(let j=0; j<w.length; j++) toClear.add(`${i+j},${c}`);
+                }
+            });
+        }
+
+        if(toClear.size > 0) {
+            let turnScore = 0;
+            [...new Set(foundWords)].forEach(w => {
+                if(w === "おちんちん" || w === "おまんこ") { fever = true; voice.add("フィーバー！" + w, true); }
+                else voice.add(w);
+                turnScore += w.length * 100;
+            });
+            if(fever) {
+                document.getElementById('fever-overlay').style.display = 'flex';
+                setTimeout(() => document.getElementById('fever-overlay').style.display = 'none', 1000);
+                turnScore *= 2;
+            }
+            updateScore(score + turnScore);
+            toClear.forEach(p => { const [r,c] = p.split(',').map(Number); board[r][c] = 0; });
+            setTimeout(() => { gravity(); check(); }, 400);
+        }
+    }
+
+    function gravity() {
+        for(let c=0; c<COLS; c++){
+            let empty = ROWS-1;
+            for(let r=ROWS-1; r>=0; r--){
+                if(board[r][c]) {
+                    let temp = board[r][c]; board[r][c] = 0; board[empty][c] = temp; empty--;
+                }
+            }
+        }
+        draw();
+    }
+
+    function shareOnX() {
+        const text = encodeURIComponent(`ことばパズル「んこぷよ」で ${score} 点獲得しました！\n`);
+        window.open(`https://twitter.com/intent/tweet?text=${text}&hashtags=んこぷよ`, '_blank');
+    }
+
+    function handleBtn(key) {
+        if(!gameActive) return;
+        if(key === 'ArrowLeft' && canMove(player.x-1, player.y, player.dir)) player.x--;
+        if(key === 'ArrowRight' && canMove(player.x+1, player.y, player.dir)) player.x++;
+        if(key === 'ArrowDown') drop();
+        if(key === 'ArrowUp') {
+            let nd = (player.dir + 1) % 4; if(canMove(player.x, player.y, nd)) player.dir = nd;
+        }
+        draw();
+    }
+
+    document.addEventListener('keydown', e => {
+        if(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+            e.preventDefault(); handleBtn(e.key);
+        }
+    });
+</script>
+</body>
+</html>
